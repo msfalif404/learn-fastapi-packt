@@ -1,12 +1,17 @@
+from fastapi import Form
 from pydantic import BaseModel
-
-class Item(BaseModel):
-    item: str
-    status: str
+from typing import List, Optional
 
 class Todo(BaseModel):
-    id: int
-    item: Item
+    id: Optional[int] = None
+    item: str
+
+    @classmethod
+    def as_form(cls, item: str = Form(...)):
+        return cls(item=item)
 
 class TodoItem(BaseModel):
     item: str
+
+class TodoItemResponse(BaseModel):
+    todos: List[TodoItem]
