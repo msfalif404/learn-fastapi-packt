@@ -14,7 +14,7 @@ class Event(BaseModel):
             "example": {
                 "title": "FastAPI Book",
                 "image": "https://image.com",
-                "description": "We will discussing about this book later."
+                "description": "We will discussing about this book later.",
                 "tags": ["python", "fastapi", "book"],
                 "location": "China"
             }
