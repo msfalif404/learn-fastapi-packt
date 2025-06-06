@@ -4,6 +4,7 @@ from beanie import Document
 from pydantic import BaseModel
 
 class Event(Document):
+    creator: Optional[str] = None
     title: str
     image: str
     description: str

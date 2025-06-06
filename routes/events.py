@@ -6,6 +6,8 @@ from database.connection import Database
 
 from models.events import Event, EventUpdate, EventResponse
 
+from auth.authenticate import authenticate
+
 event_router = APIRouter(
     tags=["Events"]
 )
@@ -35,7 +37,9 @@ async def retrieve_event(id: PydanticObjectId) -> Event:
     )
 
 @event_router.post("/")
-async def create_event(event: Event) -> dict:
+async def create_event(event: Event, user: str = Depends(authenticate)) -> dict:
+    event.creator = user
+
     await event_database.save(event)
 
     return {
@@ -44,7 +48,14 @@ async def create_event(event: Event) -> dict:
     }
 
 @event_router.put("/{id}", response_model=Event)
-async def update_event(id: PydanticObjectId, data: EventUpdate) -> Event:
+async def update_event(id: PydanticObjectId, data: EventUpdate, user: str = Depends(authenticate)) -> Event:
+    event = await event_database.get(id)
+    if event.creator != user:
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "Operation not allowed"
+        )
+
     updated_event = await event_database.update(id, data)
 
     if not updated_event:
@@ -56,7 +67,14 @@ async def update_event(id: PydanticObjectId, data: EventUpdate) -> Event:
     return updated_event
 
 @event_router.delete("/{id}")
-async def delete_event(id: PydanticObjectId) -> dict:
+async def delete_event(id: PydanticObjectId, user: str = Depends(authenticate)) -> dict:
+    event = await event_database.get(id)
+    if event.creator != user:
+        raise HTTPException(
+            status_code = status.HTTP_400_BAD_REQUEST,
+            detail = "Operation not allowed"
+        )
+        
     event = await event_database.delete(id)
 
     if not event:
