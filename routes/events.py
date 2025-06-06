@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Depends, Body, HTTPException, status
 from typing import List
+from fastapi import APIRouter, Depends, Body, HTTPException, status
+from beanie import PydanticObjectId
 
-from database.connection import get_session
-
-from sqlmodel import select
+from database.connection import Database
 
 from models.events import Event, EventUpdate, EventResponse
 
@@ -11,12 +10,11 @@ event_router = APIRouter(
     tags=["Events"]
 )
 
-events = []
+event_database = Database(Event)
 
 @event_router.get("/", response_model=EventResponse)
-async def retrieve_all_events(session=Depends(get_session)) -> dict:
-    statement = select(Event)
-    events = session.exec(statement).all()
+async def retrieve_all_events() -> dict:
+    events = await event_database.get_all()
 
     return {
         "status": "success",
@@ -25,8 +23,8 @@ async def retrieve_all_events(session=Depends(get_session)) -> dict:
     }
 
 @event_router.get("/{id}", response_model=Event)
-async def retrieve_event(id: int, session=Depends(get_session)) -> Event:
-    event = session.get(Event, id)
+async def retrieve_event(id: PydanticObjectId) -> Event:
+    event = await event_database.get(id)
 
     if event:
         return event
@@ -37,10 +35,8 @@ async def retrieve_event(id: int, session=Depends(get_session)) -> Event:
     )
 
 @event_router.post("/")
-async def create_event(event: Event, session = Depends(get_session)) -> dict:
-    session.add(event)
-    session.commit()
-    session.refresh(event)
+async def create_event(event: Event) -> dict:
+    await event_database.save(event)
 
     return {
         "status": "success",
@@ -48,29 +44,20 @@ async def create_event(event: Event, session = Depends(get_session)) -> dict:
     }
 
 @event_router.put("/{id}", response_model=Event)
-async def update_event(id: int, data: EventUpdate, session=Depends(get_session)) -> Event:
-    event = session.get(Event, id)
+async def update_event(id: PydanticObjectId, data: EventUpdate) -> Event:
+    updated_event = await event_database.update(id, data)
 
-    if not event:
+    if not updated_event:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event with supplied ID does not exist"
         )
 
-    event_data = data.dict(exclude_unset=True)
-
-    for k, v in event_data.items():
-        setattr(event, k, v)
-
-    session.add(event)
-    session.commit()
-    session.refresh(event)
-
-    return event
+    return updated_event
 
 @event_router.delete("/{id}")
-async def delete_event(id: int, session=Depends(get_session)) -> dict:
-    event = session.get(Event, id)
+async def delete_event(id: PydanticObjectId) -> dict:
+    event = await event_database.delete(id)
 
     if not event:
         raise HTTPException(
@@ -78,8 +65,6 @@ async def delete_event(id: int, session=Depends(get_session)) -> dict:
             detail="Event with supplied ID does not exist"
         )
 
-    session.delete(event)
-    session.commit()
 
     return {
         "status": "success",

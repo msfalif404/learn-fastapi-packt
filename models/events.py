@@ -1,13 +1,13 @@
-from sqlmodel import JSON, SQLModel, Field, Column
-from typing import List, Optional
+from typing import Optional, List
+
+from beanie import Document
 from pydantic import BaseModel
 
-class Event(SQLModel, table=True):
-    id: int = Field(default = None, primary_key = True)
+class Event(Document):
     title: str
     image: str
     description: str
-    tags: List[str] = Field(sa_column=Column(JSON))
+    tags: List[str]
     location: str
 
     class Config:
@@ -20,8 +20,11 @@ class Event(SQLModel, table=True):
                 "location": "China"
             }
         }
+    
+    class Settings:
+        name = "Events"
 
-class EventUpdate(SQLModel):
+class EventUpdate(BaseModel):
     title: Optional[str]
     image: Optional[str]
     description: Optional[str]

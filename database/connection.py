@@ -1,15 +1,74 @@
-from sqlmodel import SQLModel, Session, create_engine
+from typing import Any, Optional, List
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
+
+from beanie import init_beanie, PydanticObjectId
+
 from models.events import Event
+from models.users import User
 
-DB_FILE = "planner.db"
-db_connection_string = f"sqlite:///{DB_FILE}"
-db_connection_args = {"check_same_thread":False}
+from motor.motor_asyncio import AsyncIOMotorClient
 
-engine_url = create_engine(db_connection_string, connect_args=db_connection_args, echo=True)
+class Settings(BaseSettings):
+    DATABASE_URL: Optional[str] = None
 
-def conn():
-    SQLModel.metadata.create_all(engine_url)
+    async def initialize_database(self):
+        client = AsyncIOMotorClient(self.DATABASE_URL)
+        await init_beanie(database=client.get_default_database(),
+                            document_models=[Event, User])
+    
+    class Config:
+        env_file = ".env"
 
-def get_session():
-    with Session(engine_url) as session:
-        yield session
+class Database:
+    def __init__(self, model):
+        self.model = model
+
+    async def save(self, document) -> None:
+        await document.create()
+        
+        return
+
+    async def get(self, id: PydanticObjectId) -> Any:
+        doc = await self.model.get(id)
+
+        if doc:
+            return doc
+        
+        return False
+    
+    async def get_all(self) -> List[Any]:
+        doc = await self.model.find_all().to_list()
+
+        if doc:
+            return doc
+        
+        return False
+
+    async def update(self, id: PydanticObjectId, body: BaseModel) -> Any:
+        doc_id = id
+        des_body = body.dict()
+
+        des_body = {k: v for k, v in des_body.items() if v is not None}
+        update_query = {"$set": {
+            field: value for field, value in des_body.items()
+        }}
+
+        doc = await self.get(doc_id)
+        
+        if not doc:
+            return False
+        
+        await doc.update(update_query)
+
+        return doc
+
+    async def delete(self, id: PydanticObjectId) -> bool:
+        doc = await self.get(id)
+
+        if not doc:
+            return False
+        
+        await doc.delete()
+
+        return True
